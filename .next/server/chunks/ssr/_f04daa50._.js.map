@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 7, "column": 0}, "map": {"version":3,"sources":["file:///home/runner/workspace/app/layout.tsx"],"sourcesContent":["import type React from \"react\"\nimport \"./globals.css\"\n\nexport default function RootLayout({\n  children,\n}: {\n  children: React.ReactNode\n}) {\n  return (\n    <html lang=\"en\" suppressHydrationWarning>\n      <head>\n        <title>Words & True Hearts - Shayari Image Generator</title>\n        <meta name=\"description\" content=\"Create beautiful Shayari images with custom backgrounds\" />\n      </head>\n      <body>\n          {children}\n      </body>\n    </html>\n  )\n}\n"],"names":[],"mappings":";;;;;;AAGe,SAAS,WAAW,EACjC,QAAQ,EAGT;IACC,qBACE,8OAAC;QAAK,MAAK;QAAK,wBAAwB;;0BACtC,8OAAC;;kCACC,8OAAC;kCAAM;;;;;;kCACP,8OAAC;wBAAK,MAAK;wBAAc,SAAQ;;;;;;;;;;;;0BAEnC,8OAAC;0BACI;;;;;;;;;;;;AAIX","debugId":null}},
+    {"offset": {"line": 60, "column": 0}, "map": {"version":3,"sources":["file:///home/runner/workspace/node_modules/next/src/server/route-modules/app-page/vendored/rsc/react-jsx-dev-runtime.ts"],"sourcesContent":["module.exports = require('../../module.compiled').vendored[\n  'react-rsc'\n].ReactJsxDevRuntime\n"],"names":["module","exports","require","vendored","ReactJsxDevRuntime"],"mappings":";AAAAA,OAAOC,OAAO,GAAGC,QAAQ,4HAAyBC,QAAQ,CACxD,YACD,CAACC,kBAAkB","ignoreList":[0],"debugId":null}}]
+}
