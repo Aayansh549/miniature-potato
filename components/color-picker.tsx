@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { colorOptions, ColorOption } from "@/lib/color-options";
+import { colorOptions } from "@/lib/color-options";
 
 interface ColorPickerProps {
   color: string;

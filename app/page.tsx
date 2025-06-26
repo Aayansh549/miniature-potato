@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { colorOptions } from "@/lib/color-options";
 import ColorPicker from "@/components/color-picker";
 import { generateImage } from "@/lib/utils";
+import Image from "next/image"; // <-- Import Next.js Image
 
 export default function Home() {
   const [text, setText] = useState("");
@@ -19,7 +20,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -156,16 +157,19 @@ export default function Home() {
 
             <section className="space-y-4">
               <h2 className="text-xl font-semibold">Preview</h2>
-              <div className="aspect-square w-full rounded-lg border overflow-hidden bg-muted/30">
+              <div className="aspect-square w-full rounded-lg border overflow-hidden bg-muted/30 relative">
                 {isLoading ? (
                   <Skeleton className="h-full w-full" />
                 ) : imageUrl ? (
-                  <img
+                  <Image
                     src={imageUrl}
                     alt="Generated Shayari"
-                    className="w-full h-full object-contain transition-opacity duration-500"
+                    className="object-contain transition-opacity duration-500"
                     style={{ opacity: isLoading ? 0.5 : 1 }}
                     draggable={false}
+                    fill
+                    sizes="(max-width: 640px) 100vw, 512px"
+                    priority
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">

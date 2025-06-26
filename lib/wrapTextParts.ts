@@ -1,3 +1,4 @@
+import type { SKRSContext2D } from "@napi-rs/canvas";
 import type { TextPart } from "@/lib/parse-bold";
 
 /**
@@ -5,7 +6,7 @@ import type { TextPart } from "@/lib/parse-bold";
  * Each line is an array of TextPart, empty array for blank lines.
  */
 export function wrapTextParts(
-  ctx: any,
+  ctx: SKRSContext2D,
   parts: TextPart[],
   maxWidth: number,
   maxLines: number,
@@ -24,7 +25,7 @@ export function wrapTextParts(
 
   let i = 0;
   while (i < parts.length && lines.length < maxLines) {
-    let part = parts[i];
+    const part = parts[i];
     let text = part.text;
 
     while (text.length > 0 && lines.length < maxLines) {

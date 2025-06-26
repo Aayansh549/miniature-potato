@@ -3,11 +3,12 @@ import { colorOptions } from "@/lib/color-options";
 import { parseDoubleAsteriskBold, TextPart } from "@/lib/parse-bold";
 import { wrapTextParts } from "@/lib/wrapTextParts";
 import path from "path";
+import type { Canvas, SKRSContext2D } from "@napi-rs/canvas";
+
+let GlobalFonts: typeof import("@napi-rs/canvas").GlobalFonts | undefined;
+let createCanvas: typeof import("@napi-rs/canvas").createCanvas | undefined;
 
 let hasBold = false;
-let GlobalFonts: any;
-let createCanvas: any;
-
 let hasEmojiFont = false;
 
 async function initializeCanvas() {
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
     const maxLines = 12;
     const footerFontSizePx = 32;
     const footerMargin = 12;
+
     const regularFont = hasEmojiFont
       ? `${fontSize}px "Amatic SC", "Noto Color Emoji"`
       : `${fontSize}px "Amatic SC"`;
@@ -98,12 +100,9 @@ export async function POST(request: NextRequest) {
     const watermarkText = "words and true hearts";
     const footerText = "@words.and.true.hearts ";
 
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext("2d");
-    ctx.patternQuality = "best";
-    ctx.quality = "best";
-    ctx.textDrawingMode = "path";
-    ctx.antialias = "subpixel";
+    if (!createCanvas) throw new Error("Canvas not initialized");
+    const canvas: Canvas = createCanvas(width, height);
+    const ctx: SKRSContext2D = canvas.getContext("2d");
 
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, width, height);
@@ -155,7 +154,7 @@ export async function POST(request: NextRequest) {
       maxTextWidth,
       maxLines,
       regularFont,
-      boldFont
+      boldFont,
     );
 
     const mainAreaBottom = height - footerFontSizePx - footerMargin - 12;
