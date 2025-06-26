@@ -70,7 +70,7 @@ export default function RootLayout({
           content="Turn your tiny thoughts into adorable quote images! Miniature Potato makes it easy (and fun!) to create sweet, shareable visuals for your shayari, quotes, and more — all in just a few clicks."
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://yourdomain.com/" />
+        <meta property="og:url" content="https://miniature-potato-wth.vercel.app/" />
 
         {/* Social: Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
