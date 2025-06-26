@@ -93,7 +93,7 @@ export default function Home() {
           <Button
             variant="outline"
             onClick={handleThemeToggle}
-            aria-label="Toggle dark mode"
+            aria-label="Toggle Dark Mode"
             className="shrink-0"
             tabIndex={0}
           >
@@ -102,7 +102,7 @@ export default function Home() {
             ) : (
               <MoonIcon className="h-4 w-4" />
             )}
-            <span className="sr-only">Toggle dark mode</span>
+            <span className="sr-only">Toggle Dark Mode</span>
           </Button>
         </div>
       </nav>
@@ -206,7 +206,7 @@ export default function Home() {
             </section>
           </main>
 
-          <footer className="mt-12 text-center text-sm text-muted-foreground">
+          <footer className="mt-12 border-t pt-6 text-center text-sm text-muted-foreground">
             <p>
               Made by Aayansh with{" "}
               <span aria-label="love" role="img">
