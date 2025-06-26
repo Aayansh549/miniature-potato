@@ -1,126 +1,214 @@
-import { createCanvas } from "@napi-rs/canvas"
-import { type NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server";
+import { colorOptions } from "@/lib/color-options";
+import { parseDoubleAsteriskBold, TextPart } from "@/lib/parse-bold";
+import { wrapTextParts } from "@/lib/wrapTextParts";
+import path from "path";
 
-interface TextPart {
-  text: string
-  bold: boolean
-}
+let hasBold = false;
+let GlobalFonts: any;
+let createCanvas: any;
 
-function getContrastYIQ(hexcolor: string) {
-  hexcolor = hexcolor.replace("#", "")
-  const r = Number.parseInt(hexcolor.substr(0, 2), 16)
-  const g = Number.parseInt(hexcolor.substr(2, 2), 16)
-  const b = Number.parseInt(hexcolor.substr(4, 2), 16)
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000
-  return yiq >= 128 ? "#222" : "#fff"
-}
+let hasEmojiFont = false;
 
-function parseMarkdownBold(line: string): TextPart[] {
-  const result: TextPart[] = []
-  let match
-  let lastIndex = 0
-  const regex = /\*\*(.*?)\*\*/g
+async function initializeCanvas() {
+  try {
+    const canvas = await import("@napi-rs/canvas");
+    createCanvas = canvas.createCanvas;
+    GlobalFonts = canvas.GlobalFonts;
+    const AMATIC_REGULAR_PATH = path.resolve(
+      process.cwd(),
+      "fonts/AmaticSC-Regular.ttf",
+    );
+    const AMATIC_BOLD_PATH = path.resolve(
+      process.cwd(),
+      "fonts/AmaticSC-Bold.ttf",
+    );
+    const DAILY_BUBBLE_PATH = path.resolve(
+      process.cwd(),
+      "fonts/DailyBubble.ttf",
+    );
+    const EMOJI_FONT_PATH = path.resolve(
+      process.cwd(),
+      "fonts/NotoColorEmoji-Regular.ttf",
+    );
 
-  while ((match = regex.exec(line)) !== null) {
-    if (match.index > lastIndex) {
-      result.push({ text: line.slice(lastIndex, match.index), bold: false })
+    GlobalFonts.registerFromPath(AMATIC_REGULAR_PATH, "Amatic SC");
+    GlobalFonts.registerFromPath(DAILY_BUBBLE_PATH, "Daily Bubble");
+    try {
+      GlobalFonts.registerFromPath(AMATIC_BOLD_PATH, "Amatic SC Bold");
+      hasBold = true;
+    } catch {
+      hasBold = false;
     }
-    result.push({ text: match[1], bold: true })
-    lastIndex = regex.lastIndex
+    try {
+      GlobalFonts.registerFromPath(EMOJI_FONT_PATH, "Noto Color Emoji");
+      hasEmojiFont = true;
+    } catch {
+      hasEmojiFont = false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Failed to initialize canvas:", error);
+    return false;
   }
+}
 
-  if (lastIndex < line.length) {
-    result.push({ text: line.slice(lastIndex), bold: false })
-  }
-
-  return result
+function getWatermarkStyle(bgColor: string): {
+  fillStyle: string;
+  shadowColor: string;
+  shadowBlur: number;
+} {
+  const colorObj = colorOptions.find(
+    (c) =>
+      c.value.toLowerCase() === bgColor.toLowerCase() ||
+      c.name.toLowerCase() === bgColor.toLowerCase(),
+  );
+  const alpha = colorObj?.watermarkAlpha ?? 0.13;
+  return {
+    fillStyle: `rgba(255,255,255,${alpha})`,
+    shadowColor: "rgba(0,0,0,0)",
+    shadowBlur: 0,
+  };
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { text, bgColor = "#94F6BC", width = 1080, height = 1080 } = await request.json()
+    const initialized = await initializeCanvas();
+    if (!initialized) throw new Error("Failed to initialize canvas");
 
-    const W = Math.max(300, Math.min(2000, Number(width)))
-    const H = Math.max(300, Math.min(3000, Number(height)))
+    const { text, bgColor = "#94F6BC", fontSize = 40 } = await request.json();
 
-    const canvas = createCanvas(W, H)
-    const ctx = canvas.getContext("2d")
+    const width = 1080;
+    const height = 1080;
+    const maxTextWidth = 775;
+    const maxLines = 12;
+    const footerFontSizePx = 32;
+    const footerMargin = 12;
+    const regularFont = hasEmojiFont
+      ? `${fontSize}px "Amatic SC", "Noto Color Emoji"`
+      : `${fontSize}px "Amatic SC"`;
+    const boldFont = hasBold
+      ? hasEmojiFont
+        ? `${fontSize}px "Amatic SC Bold", "Noto Color Emoji"`
+        : `${fontSize}px "Amatic SC Bold"`
+      : hasEmojiFont
+        ? `bold ${fontSize}px "Amatic SC", "Noto Color Emoji"`
+        : `bold ${fontSize}px "Amatic SC"`;
+    const watermarkFont = "Daily Bubble";
+    const watermarkText = "words and true hearts";
+    const footerText = "@words.and.true.hearts ";
 
-    // Fill background
-    ctx.fillStyle = bgColor
-    ctx.fillRect(0, 0, W, H)
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext("2d");
+    ctx.patternQuality = "best";
+    ctx.quality = "best";
+    ctx.textDrawingMode = "path";
+    ctx.antialias = "subpixel";
 
-    // Use system fonts
-    const regularFont = "Arial"
-    const boldFont = "Arial Bold"
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, width, height);
 
-    // Add watermark
-    const watermark = "Words and True Hearts"
-    ctx.save()
-    ctx.translate(W / 2, H / 2)
-    ctx.rotate(-Math.PI / 4)
-    ctx.globalAlpha = 0.09
-    ctx.font = `bold ${Math.round(W / 12)}px ${regularFont}`
-    ctx.fillStyle = getContrastYIQ(bgColor)
-    ctx.fillText(watermark, -W / 2, 0)
-    ctx.restore()
+    // --- WATERMARK ---
+    ctx.save();
+    const diagLen = Math.sqrt(width * width + height * height);
+    let fontPx = Math.floor(diagLen / 10.5);
+    ctx.font = `bold ${fontPx}px "${watermarkFont}"`;
+    let textWidth = ctx.measureText(watermarkText).width;
 
-    // Add footer
-    const footerText = "@words.and.true.hearts"
-    ctx.save()
-    ctx.font = `italic 24px ${regularFont}`
-    ctx.fillStyle = "#222"
-    ctx.textAlign = "center"
-    ctx.fillText(footerText, W / 2, H - 40)
-    ctx.restore()
+    while (textWidth < diagLen * 0.98 && fontPx < diagLen / 4) {
+      fontPx += 2;
+      ctx.font = `bold ${fontPx}px "${watermarkFont}"`;
+      textWidth = ctx.measureText(watermarkText).width;
+    }
+    while (textWidth > diagLen && fontPx > 10) {
+      fontPx -= 2;
+      ctx.font = `bold ${fontPx}px "${watermarkFont}"`;
+      textWidth = ctx.measureText(watermarkText).width;
+    }
 
-    // Process and draw main text
-    ctx.save()
-    const lines = String(text || "")
-      .split("\n")
-      .map((line) => line.trim())
-    const linesParsed = lines.map(parseMarkdownBold)
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(-Math.atan2(height, width));
 
-    // Simple text rendering with fixed font size
-    const fontSize = 48
-    const lineHeight = fontSize * 1.5
+    const { fillStyle, shadowColor, shadowBlur } = getWatermarkStyle(bgColor);
+    ctx.font = `bold ${fontPx}px "${watermarkFont}"`;
+    ctx.shadowColor = shadowColor;
+    ctx.shadowBlur = shadowBlur;
 
-    // Center text vertically
-    const startY = (H - lines.length * lineHeight) / 2
+    const spacing = fontPx + 24;
+    const numLines = Math.ceil(diagLen / spacing);
+
+    for (let i = -numLines; i <= numLines; i++) {
+      ctx.fillStyle = fillStyle;
+      ctx.fillText(watermarkText, -textWidth / 2, i * spacing);
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    // --- MAIN TEXT ---
+    ctx.save();
+
+    const textParts: TextPart[] = parseDoubleAsteriskBold(text || "");
+
+    const linesParsed: TextPart[][] = wrapTextParts(
+      ctx,
+      textParts,
+      maxTextWidth,
+      maxLines,
+      regularFont,
+      boldFont
+    );
+
+    const mainAreaBottom = height - footerFontSizePx - footerMargin - 12;
+    const mainAreaTop = 0;
+    const textBlockHeight = linesParsed.length * Math.round(fontSize * 1.5);
+    const startY =
+      Math.floor((mainAreaBottom - mainAreaTop - textBlockHeight) / 2) +
+      Math.round(fontSize * 1.5 * 0.85);
+
+    const sideMargin = (width - maxTextWidth) / 2;
+    const lineSpacing = Math.round(fontSize * 1.5);
 
     for (let i = 0; i < linesParsed.length; i++) {
-      let lineWidth = 0
-
-      // Calculate line width
-      for (const part of linesParsed[i]) {
-        ctx.font = part.bold ? `bold ${fontSize}px ${boldFont}` : `${fontSize}px ${regularFont}`
-        lineWidth += ctx.measureText(part.text).width
+      const parsed = linesParsed[i];
+      let x = sideMargin;
+      const y = startY + i * lineSpacing;
+      if (parsed.length === 1 && parsed[0].text === "") {
+        continue;
       }
-
-      // Center text horizontally
-      let x = (W - lineWidth) / 2
-      const y = startY + i * lineHeight
-
-      // Draw each part of the line
-      for (const part of linesParsed[i]) {
-        ctx.font = part.bold ? `bold ${fontSize}px ${boldFont}` : `${fontSize}px ${regularFont}`
-        ctx.fillStyle = "#222"
-        ctx.fillText(part.text, x, y)
-        x += ctx.measureText(part.text).width
+      for (const part of parsed) {
+        ctx.font = part.bold ? boldFont : regularFont;
+        ctx.fillStyle = "#222";
+        ctx.fillText(part.text, x, y);
+        x += ctx.measureText(part.text).width;
       }
     }
-    ctx.restore()
+    ctx.restore();
 
-    const buffer = await canvas.encode("png")
+    // --- FOOTER ---
+    ctx.save();
+    ctx.font = hasEmojiFont
+      ? `${footerFontSizePx}px "Amatic SC", "Noto Color Emoji"`
+      : `${footerFontSizePx}px "Amatic SC"`;
+    ctx.fillStyle = "#222";
+    ctx.textAlign = "center";
+    ctx.fillText(footerText, width / 2, height - footerMargin);
+    ctx.restore();
 
+    const buffer = await canvas.encode("png");
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "no-store",
       },
-    })
+    });
   } catch (error) {
-    console.error("Image generation error:", error)
-    return NextResponse.json({ error: "Failed to generate image" }, { status: 500 })
+    console.error("Image generation error:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to generate image",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
   }
 }
