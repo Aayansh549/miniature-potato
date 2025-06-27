@@ -33,9 +33,20 @@ export async function getSongSuggestions(
     });
     const data = await res.json();
     return data;
-  } catch (e: any) {
+  } catch (e) {
+    let errorMessage = "API call failed";
+    if (
+      typeof e === "object" &&
+      e !== null &&
+      "message" in e &&
+      typeof (e as { message?: unknown }).message === "string"
+    ) {
+      errorMessage = (e as { message: string }).message;
+    } else if (typeof e === "string") {
+      errorMessage = e;
+    }
     return {
-      error: e?.message || "API call failed",
+      error: errorMessage,
       raw: "",
     };
   }
@@ -51,7 +62,8 @@ export const songErrorMap: Record<
       /no access to model|no access|access to model|quota|limit|overloaded|rate|usage/i.test(
         err,
       ),
-    message: "High usage detected. This may take a while to become available again.",
+    message:
+      "High usage detected. This may take a while to become available again.",
   },
   // Add more error codes/messages here in the future as needed.
 };

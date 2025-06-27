@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     try {
       const parsed = JSON.parse(jsonStr);
       return NextResponse.json(parsed);
-    } catch (e) {
+    } catch {
       console.warn("❌ Failed to parse JSON:", jsonStr);
       return NextResponse.json(
         {
@@ -113,11 +113,24 @@ export async function POST(req: NextRequest) {
         { status: 500 },
       );
     }
-  } catch (e: any) {
+  } catch (e) {
     console.error("OpenAI API call failed:", e);
+
+    let errorMessage = "OpenAI API call failed";
+    if (
+      typeof e === "object" &&
+      e !== null &&
+      "message" in e &&
+      typeof (e as { message?: unknown }).message === "string"
+    ) {
+      errorMessage = (e as { message: string }).message;
+    } else if (typeof e === "string") {
+      errorMessage = e;
+    }
+
     return NextResponse.json(
       {
-        error: e?.message || "OpenAI API call failed",
+        error: errorMessage,
         raw: "",
       },
       { status: 500 },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -102,7 +102,7 @@ function SongCard({
         </span>
       </div>
       <blockquote className="border-l-2 border-muted-foreground/30 pl-3 italic text-muted-foreground text-sm leading-relaxed">
-        "{song.lyric}"
+        {song.lyric}
       </blockquote>
     </div>
   );
@@ -278,18 +278,33 @@ export default function Home() {
                 setSongError(null);
                 setLastSongError(null);
               } else {
-                const errMsg =
-                  typeof result?.error === "string"
-                    ? result.error
-                    : "Could not get song suggestions. Try adjusting your text or try again later.";
+                let errMsg =
+                  "Could not get song suggestions. Try adjusting your text or try again later.";
+
+                if (
+                  result &&
+                  typeof result === "object" &&
+                  "error" in result &&
+                  typeof (result as { error?: unknown }).error === "string"
+                ) {
+                  errMsg = (result as { error: string }).error;
+                }
+
                 setSongResult(null);
                 setSongError(errMsg);
                 setLastSongResult(null);
                 setLastSongError(errMsg);
               }
             }
-          } catch (err: any) {
-            if (err?.name === "AbortError") return;
+          } catch (err) {
+            if (
+              typeof err === "object" &&
+              err !== null &&
+              "name" in err &&
+              (err as { name?: unknown }).name === "AbortError"
+            ) {
+              return;
+            }
             setSongResult(null);
             setSongError(
               "Could not get song suggestions. Try adjusting your text or try again later.",
@@ -302,7 +317,7 @@ export default function Home() {
           setIsSongLoading(false);
           songRequestInFlightFor.current = null;
         }, 0);
-      } catch (err: any) {
+      } catch {
         setImageError("Failed to generate image. Please try again.");
         setIsSongLoading(false); // Don't fetch songs if image fails
       } finally {
@@ -321,7 +336,7 @@ export default function Home() {
           setImageUrl(url);
           setDownloaded(false);
           prevBlobUrl.current = url;
-        } catch (err) {
+        } catch {
           setImageError("Failed to generate image. Please try again.");
         } finally {
           setIsImageLoading(false);
@@ -348,7 +363,7 @@ export default function Home() {
             setSongError(lastSongError);
             setIsSongLoading(false);
           }, 900);
-        } catch (err) {
+        } catch {
           setImageError("Failed to generate image. Please try again.");
           setIsSongLoading(false);
         } finally {
