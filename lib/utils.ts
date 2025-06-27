@@ -7,11 +7,70 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** --- SONG SUGGESTIONS --- */
+export type SongRecommendation = {
+  title: string;
+  artist: string;
+  timestamp: string;
+  lyric: string;
+  highlyRecommended: boolean;
+};
+
+type SongSuccess = { recommendations: SongRecommendation[] };
+type SongError = { error: string; raw: string };
+export type SongResult = SongSuccess | SongError | undefined;
+
+export async function getSongSuggestions(
+  userText: string,
+  options?: { signal?: AbortSignal },
+): Promise<SongResult> {
+  try {
+    const res = await fetch("/api/song-suggestion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userText }),
+      signal: options?.signal,
+    });
+    const data = await res.json();
+    return data;
+  } catch (e: any) {
+    return {
+      error: e?.message || "API call failed",
+      raw: "",
+    };
+  }
+}
+
+/** --- SONG ERROR MAP --- */
+export const songErrorMap: Record<
+  string,
+  { match: (err: string) => boolean; message: string }
+> = {
+  limit: {
+    match: (err) =>
+      /no access to model|no access|access to model|quota|limit|overloaded|rate|usage/i.test(
+        err,
+      ),
+    message: "High usage detected. This may take a while to become available again.",
+  },
+  // Add more error codes/messages here in the future as needed.
+};
+
+/** --- NORMALIZE TEXT --- */
+export function normalizeText(input: string): string {
+  return input
+    .replace(/[\s\n\r\t]+/g, " ")
+    .replace(/[^\w\s]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 /** --- IMAGE GENERATION --- */
 export async function generateImage(
   text: string,
   bgColor: string,
   fontSize: number,
+  options?: { signal?: AbortSignal },
 ): Promise<Blob> {
   const response = await fetch("/api/generate-image", {
     method: "POST",
@@ -19,6 +78,7 @@ export async function generateImage(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ text, bgColor, fontSize }),
+    signal: options?.signal,
   });
 
   if (!response.ok) {
