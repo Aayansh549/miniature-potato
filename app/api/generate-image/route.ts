@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { colorOptions } from "@/lib/color-options";
-import { parseDoubleAsteriskBold, TextPart } from "@/lib/parse-bold";
-import { wrapTextParts } from "@/lib/wrapTextParts";
+import { parseDoubleAsteriskBold, TextPart, wrapTextParts } from "@/lib/utils";
 import path from "path";
 import type { Canvas, SKRSContext2D } from "@napi-rs/canvas";
 
