@@ -16,7 +16,7 @@ export type SongRecommendation = {
   highlyRecommended: boolean;
 };
 
-type SongSuccess = { recommendations: SongRecommendation[] };
+type SongSuccess = SongRecommendation[];
 type SongError = { error: string; raw: string };
 export type SongResult = SongSuccess | SongError | undefined;
 
@@ -32,7 +32,27 @@ export async function getSongSuggestions(
       signal: options?.signal,
     });
     const data = await res.json();
-    return data;
+
+    // If the API returns an error object
+    if (
+      data &&
+      typeof data === "object" &&
+      !Array.isArray(data) &&
+      "error" in data
+    ) {
+      return data as SongError;
+    }
+
+    // Otherwise, expect it to be a SongRecommendation[]
+    if (Array.isArray(data)) {
+      return data as SongRecommendation[];
+    }
+
+    // Fallback error
+    return {
+      error: "Unexpected API response",
+      raw: JSON.stringify(data),
+    };
   } catch (e) {
     let errorMessage = "API call failed";
     if (

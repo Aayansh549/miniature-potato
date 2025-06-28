@@ -27,7 +27,7 @@ import {
   CheckIcon,
 } from "@radix-ui/react-icons";
 
-// — UTILS —
+// --- UTILS ---
 function isSongRecommendationArray(val: unknown): val is SongRecommendation[] {
   return (
     Array.isArray(val) &&
@@ -65,7 +65,7 @@ function LoaderIcon({ className = "" }: { className?: string }) {
   );
 }
 
-// — SONG CARD —
+// --- SONG CARD ---
 function SongCard({
   song,
   isFirst,
@@ -108,7 +108,6 @@ function SongCard({
   );
 }
 
-// — SONG SKELETON CARD —
 function SongSkeletonCard() {
   return (
     <div
@@ -135,12 +134,12 @@ function getSongSuggestionErrorDisplay(error?: string) {
       return <AlertCard message={songErrorMap[key].message} />;
     }
   }
-  // Default fallback
   return <AlertCard message={error} />;
 }
 
-// — MAIN —
+// --- MAIN ---
 export default function Home() {
+  // UI and generation states
   const [text, setText] = useState("");
   const [color, setColor] = useState(colorOptions[0].value);
   const [fontSize, setFontSize] = useState(50);
@@ -151,23 +150,23 @@ export default function Home() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Song suggestions
+  // Songs
   const [isSongLoading, setIsSongLoading] = useState(false);
   const [songResult, setSongResult] = useState<SongRecommendation[] | null>(
     null,
   );
   const [songError, setSongError] = useState<string | null>(null);
 
-  // Section persistence: show after first generate, never hide again
+  // Section visibility
   const [sectionsVisible, setSectionsVisible] = useState(false);
 
-  // Last successful song recommendations (for "no text change" quick re-show)
+  // Last successful song recommendations
   const [lastSongResult, setLastSongResult] = useState<
     SongRecommendation[] | null
   >(null);
   const [lastSongError, setLastSongError] = useState<string | null>(null);
 
-  // Download button effect
+  // Download
   const [downloaded, setDownloaded] = useState(false);
 
   // Prevent spam generates
@@ -188,7 +187,7 @@ export default function Home() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // Clean up blob URLs and timers on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (prevBlobUrl.current) URL.revokeObjectURL(prevBlobUrl.current);
@@ -201,7 +200,7 @@ export default function Home() {
   const handleThemeToggle = () =>
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
 
-  // --- Handle Submit ---
+  // --- Handle Submit (parallel) ---
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -214,7 +213,6 @@ export default function Home() {
       .replace(/^\s+/g, "");
     setText(cleanedText);
 
-    // Prevent spam taps for 0.5s
     setGenerateDisabled(true);
     setTimeout(() => setGenerateDisabled(false), 500);
 
@@ -227,14 +225,13 @@ export default function Home() {
     setImageUrl(null);
     setImageLoaded(false);
 
-    // Clean up old blobs
     if (prevBlobUrl.current) {
       URL.revokeObjectURL(prevBlobUrl.current);
       prevBlobUrl.current = null;
     }
 
-    // Abort previous image request
     imageAbortController.current?.abort();
+    songAbortController.current?.abort();
 
     const normalizedNow = normalizeText(cleanedText);
     const textChanged =
@@ -246,83 +243,79 @@ export default function Home() {
       setIsSongLoading(true);
       setSongResult(null);
       setSongError(null);
-      songAbortController.current?.abort();
 
-      try {
-        imageAbortController.current = new AbortController();
-        const imageBlob = await generateImage(cleanedText, color, fontSize, {
-          signal: imageAbortController.current.signal,
+      imageAbortController.current = new AbortController();
+      songAbortController.current = new AbortController();
+      lastFetchedText.current = normalizedNow;
+      songRequestInFlightFor.current = normalizedNow;
+
+      // Run both requests in parallel
+      generateImage(cleanedText, color, fontSize, {
+        signal: imageAbortController.current.signal,
+      })
+        .then((imageBlob) => {
+          const url = URL.createObjectURL(imageBlob);
+          setImageUrl(url);
+          setDownloaded(false);
+          prevBlobUrl.current = url;
+        })
+        .catch(() => {
+          setImageError("Failed to generate image. Please try again.");
+        })
+        .finally(() => {
+          setIsImageLoading(false);
         });
-        const url = URL.createObjectURL(imageBlob);
-        setImageUrl(url);
-        setDownloaded(false);
-        prevBlobUrl.current = url;
 
-        lastFetchedText.current = normalizedNow;
-        songRequestInFlightFor.current = normalizedNow;
-
-        setTimeout(async () => {
-          try {
-            songAbortController.current = new AbortController();
-            const result = await getSongSuggestions(cleanedText, {
-              signal: songAbortController.current.signal,
-            });
-            if (songRequestInFlightFor.current === normalizedNow) {
+      getSongSuggestions(cleanedText, {
+        signal: songAbortController.current.signal,
+      })
+        .then((result) => {
+          if (songRequestInFlightFor.current === normalizedNow) {
+            if (Array.isArray(result) && isSongRecommendationArray(result)) {
+              setSongResult(result);
+              setLastSongResult(result);
+              setSongError(null);
+              setLastSongError(null);
+            } else {
+              let errMsg =
+                "Could not get song suggestions. Try adjusting your text or try again later.";
               if (
                 result &&
-                "recommendations" in result &&
-                isSongRecommendationArray(result.recommendations)
+                typeof result === "object" &&
+                "error" in result &&
+                typeof (result as { error?: unknown }).error === "string"
               ) {
-                setSongResult(result.recommendations);
-                setLastSongResult(result.recommendations);
-                setSongError(null);
-                setLastSongError(null);
-              } else {
-                let errMsg =
-                  "Could not get song suggestions. Try adjusting your text or try again later.";
-
-                if (
-                  result &&
-                  typeof result === "object" &&
-                  "error" in result &&
-                  typeof (result as { error?: unknown }).error === "string"
-                ) {
-                  errMsg = (result as { error: string }).error;
-                }
-
-                setSongResult(null);
-                setSongError(errMsg);
-                setLastSongResult(null);
-                setLastSongError(errMsg);
+                errMsg = (result as { error: string }).error;
               }
+              setSongResult(null);
+              setSongError(errMsg);
+              setLastSongResult(null);
+              setLastSongError(errMsg);
             }
-          } catch (err) {
-            if (
-              typeof err === "object" &&
-              err !== null &&
-              "name" in err &&
-              (err as { name?: unknown }).name === "AbortError"
-            ) {
-              return;
-            }
-            setSongResult(null);
-            setSongError(
-              "Could not get song suggestions. Try adjusting your text or try again later.",
-            );
-            setLastSongResult(null);
-            setLastSongError(
-              "Could not get song suggestions. Try adjusting your text or try again later.",
-            );
           }
+        })
+        .catch((err) => {
+          if (
+            typeof err === "object" &&
+            err !== null &&
+            "name" in err &&
+            (err as { name?: unknown }).name === "AbortError"
+          ) {
+            return;
+          }
+          setSongResult(null);
+          setSongError(
+            "Could not get song suggestions. Try adjusting your text or try again later.",
+          );
+          setLastSongResult(null);
+          setLastSongError(
+            "Could not get song suggestions. Try adjusting your text or try again later.",
+          );
+        })
+        .finally(() => {
           setIsSongLoading(false);
           songRequestInFlightFor.current = null;
-        }, 0);
-      } catch {
-        setImageError("Failed to generate image. Please try again.");
-        setIsSongLoading(false); // Don't fetch songs if image fails
-      } finally {
-        setIsImageLoading(false);
-      }
+        });
     } else {
       // If text is the same:
       if (isSongLoading) {
@@ -386,6 +379,7 @@ export default function Home() {
     downloadTimeout.current = setTimeout(() => setDownloaded(false), 5000);
   };
 
+  // --- UI ---
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
       {/* Navbar */}
@@ -533,7 +527,6 @@ export default function Home() {
                   <h2 className="text-xl font-semibold text-foreground">
                     Song Suggestions
                   </h2>
-                  {/* Song skeletons */}
                   {isSongLoading && (
                     <div className="space-y-4">
                       {Array.from({ length: 3 }).map((_, idx) => (
